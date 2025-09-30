@@ -11,6 +11,7 @@ Convert Figma designs to React components with a streamlined workflow.
 - **Code Generation**: Automatically convert Figma designs to React components
 - **Live Preview**: View generated components in a pixel-perfect preview
 - **Lean & Fast**: Minimal dependencies, built with Vite for optimal performance
+- **Deterministic Component Source (Phase 3.7)**: Generate a stable, memo-optional React component TSX string with consistent style ordering.
 
 ## User Flow
 
@@ -96,4 +97,31 @@ npm run build
 ## License
 
 MIT
+
+## React Component Generation (Phase 3.7)
+
+You can export a reusable component source once the internal IR is built.
+
+```ts
+import { buildIR } from './src/ir';
+import { generateReactComponentSource } from './src/codeGenerator';
+
+// rootFigmaNode: fetched via Figma API
+const ir = buildIR(rootFigmaNode);
+if (ir) {
+	const source = generateReactComponentSource(ir, { memo: true });
+	// Persist to disk, print, or evaluate as needed
+	console.log(source);
+}
+```
+
+Characteristics:
+- Deterministic ordering of style keys and child nodes (snapshot-tested)
+- Optional memoization wrapper (`options.memo`)
+- Root accepts optional `className` prop
+- Text nodes rendered as spans preserving whitespace (`white-space: pre-wrap`)
+
+Determinism Benefit: If you check the emitted TSX into version control, design changes produce minimal diffs, simplifying code review.
+
+Future Scope Ideas: custom component name, CSS module extraction, external style tokens once introduced.
 
