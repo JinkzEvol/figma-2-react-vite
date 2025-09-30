@@ -26,6 +26,10 @@ export interface DesignNode {
     fontFamily?: string
     fontSize?: number
     fontWeight?: number
+    color?: string
+    lineHeight?: number
+    letterSpacing?: number
+    textAlign?: string
   }
   placeholder?: { role: string; ariaLabel: string } | undefined
   children?: DesignNode[]
@@ -95,11 +99,18 @@ function buildLayout(node: FigmaNode): DesignNode['layout'] | undefined {
 
 function buildText(node: FigmaNode): DesignNode['text'] | undefined {
   if (node.type !== 'TEXT' || !node.characters) return undefined
+  // Extract text color from first visible solid fill
+  const fill = node.fills?.find(f => (f as any).visible !== false && f.type === 'SOLID' && f.color)
+  const color = fill && (fill as any).color ? colorToRgba((fill as any).color) : undefined
   return {
     characters: node.characters,
     fontFamily: node.style?.fontFamily,
     fontSize: node.style?.fontSize,
     fontWeight: node.style?.fontWeight,
+    color,
+    lineHeight: node.style?.lineHeightPx,
+    letterSpacing: node.style?.letterSpacing,
+    textAlign: node.style?.textAlignHorizontal?.toLowerCase(),
   }
 }
 

@@ -92,11 +92,21 @@ export function generateCodeFromIR(ir: DesignNode | null | undefined): string {
     if (node.visual?.background) s.background = node.visual.background;
     if (node.visual?.border) s.border = `${node.visual.border.weight}px solid ${node.visual.border.color}`;
     if (node.visual?.radius) s.borderRadius = node.visual.radius.join('px ') + 'px';
+    if (node.effects?.shadows && node.effects.shadows.length) {
+      s.boxShadow = node.effects.shadows.map(sh => {
+        const inset = sh.inset ? 'inset ' : '';
+        return `${inset}${sh.x}px ${sh.y}px ${sh.blur}px 0 ${sh.color}`;
+      }).join(', ');
+    }
     if (node.effects?.blur) s.filter = `blur(${node.effects.blur}px)`;
     if (node.text) {
       if (node.text.fontFamily) s.fontFamily = node.text.fontFamily;
       if (node.text.fontSize) s.fontSize = node.text.fontSize + 'px';
       if (node.text.fontWeight) s.fontWeight = String(node.text.fontWeight);
+      if (node.text.color) s.color = node.text.color;
+      if (node.text.lineHeight) s.lineHeight = node.text.lineHeight + 'px';
+      if (node.text.letterSpacing) s.letterSpacing = node.text.letterSpacing + 'px';
+      if (node.text.textAlign) s.textAlign = node.text.textAlign;
       // text fidelity extras
       s.whiteSpace = 'pre-wrap';
       s.wordBreak = 'break-word';
@@ -161,12 +171,22 @@ export function generateReactComponentSource(ir: DesignNode | null | undefined, 
     if (node.visual?.background) s.background = node.visual.background;
     if (node.visual?.border) s.border = `${node.visual.border.weight}px solid ${node.visual.border.color}`;
     if (node.visual?.radius) s['border-radius'] = node.visual.radius.join('px ') + 'px';
+    if (node.effects?.shadows && node.effects.shadows.length) {
+      s['box-shadow'] = node.effects.shadows.map(sh => {
+        const inset = sh.inset ? 'inset ' : '';
+        return `${inset}${sh.x}px ${sh.y}px ${sh.blur}px 0 ${sh.color}`;
+      }).join(', ');
+    }
     if (node.effects?.blur) s.filter = `blur(${node.effects.blur}px)`;
     if (typeof node.opacity === 'number') s.opacity = node.opacity;
     if (node.text) {
       if (node.text.fontFamily) s['font-family'] = node.text.fontFamily;
       if (node.text.fontSize) s['font-size'] = node.text.fontSize + 'px';
       if (node.text.fontWeight) s['font-weight'] = node.text.fontWeight;
+      if (node.text.color) s.color = node.text.color;
+      if (node.text.lineHeight) s['line-height'] = node.text.lineHeight + 'px';
+      if (node.text.letterSpacing) s['letter-spacing'] = node.text.letterSpacing + 'px';
+      if (node.text.textAlign) s['text-align'] = node.text.textAlign;
       s['white-space'] = 'pre-wrap';
       s['word-break'] = 'break-word';
     }
