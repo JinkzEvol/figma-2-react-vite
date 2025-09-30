@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, createElement } from 'react';
 import { Link } from 'react-router-dom';
 
 function PreviewPage() {
@@ -13,12 +13,12 @@ function PreviewPage() {
       // Dynamically create and render the component
       try {
         // Create a function from the generated code
-        const componentFunction = new Function('React', `
-          ${generatedCode}
-          return FigmaComponent;
+        // The generated code is an IIFE that takes createElement and returns a component
+        const componentFunction = new Function('createElement', `
+          return ${generatedCode}(createElement);
         `);
         
-        const GeneratedComponent = componentFunction({ createElement: null });
+        const GeneratedComponent = componentFunction(createElement);
         setComponent(() => GeneratedComponent);
       } catch (error) {
         console.error('Error creating component:', error);

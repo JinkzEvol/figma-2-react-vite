@@ -59,25 +59,30 @@ function generateNodeStyles(node: FigmaNode): string {
 function generateComponentCode(node: FigmaNode, level = 0): string {
   const indent = '  '.repeat(level);
   const styles = generateNodeStyles(node);
-  const styleAttr = styles ? ` style={{ ${styles.split('; ').map(s => {
+  
+  // Generate style object for createElement
+  const styleObj = styles ? `{ ${styles.split('; ').map(s => {
     const [key, value] = s.split(': ');
     const camelKey = key.replace(/-([a-z])/g, g => g[1].toUpperCase());
     return `${camelKey}: '${value}'`;
-  }).join(', ')} }}` : '';
+  }).join(', ')} }` : 'null';
+
+  const propsObj = styles ? `{ style: ${styleObj} }` : 'null';
 
   if (node.type === 'TEXT' && node.characters) {
-    return `${indent}<div${styleAttr}>${node.characters}</div>`;
+    // For text nodes, pass the text as the third argument (children)
+    return `${indent}createElement('div', ${propsObj}, '${node.characters.replace(/'/g, "\\'")}')`;
   }
 
   if (!node.children || node.children.length === 0) {
-    return `${indent}<div${styleAttr} />`;
+    return `${indent}createElement('div', ${propsObj})`;
   }
 
   const childrenCode = node.children
     .map(child => generateComponentCode(child, level + 1))
-    .join('\n');
+    .join(',\n');
 
-  return `${indent}<div${styleAttr}>\n${childrenCode}\n${indent}</div>`;
+  return `${indent}createElement('div', ${propsObj},\n${childrenCode}\n${indent})`;
 }
 
 export function generateReactCode(designData: {
@@ -105,11 +110,10 @@ export function generateReactCode(designData: {
   const componentName = 'FigmaComponent';
   const componentCode = generateComponentCode(rootNode, 2);
 
-  return `function ${componentName}() {
-  return (
-${componentCode}
-  );
-}
-
-export default ${componentName};`;
+  return `(function(createElement) {
+  function ${componentName}() {
+    return ${componentCode};
+  }
+  return ${componentName};
+})`;
 }
