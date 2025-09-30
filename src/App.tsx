@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { fetchFigmaDesign, parseFigmaUrl } from './figmaApi';
 import { generateReactCode } from './codeGenerator';
@@ -13,9 +13,25 @@ function Home() {
   const [generatedCode, setGeneratedCode] = useState('');
   const [step, setStep] = useState<'pat' | 'url' | 'processing' | 'done'>('pat');
 
+  // On mount, load persisted PAT (Phase 3.8 T074)
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('figmaPat');
+      if (stored && stored.trim()) {
+        setPat(stored);
+        // Auto-skip to URL entry step if PAT already persisted
+        setStep('url');
+      }
+    } catch {
+      // ignore storage errors (private mode etc.)
+    }
+  }, []);
+
   const handlePatSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (pat.trim()) {
+      // Persist PAT (Phase 3.8 T074)
+      try { localStorage.setItem('figmaPat', pat.trim()); } catch { /* ignore */ }
       setStep('url');
       setError('');
     } else {
@@ -55,10 +71,18 @@ function Home() {
   };
 
   const handleReset = () => {
-    setPat('');
+    // Do not clear persisted PAT on full reset (explicit clear is a deferred feature)
     setFigmaUrl('');
     setGeneratedCode('');
-    setStep('pat');
+    // If persisted PAT exists, return to URL step; otherwise PAT step
+    const stored = (() => { try { return localStorage.getItem('figmaPat'); } catch { return ''; } })();
+    if (stored && stored.trim()) {
+      setPat(stored);
+      setStep('url');
+    } else {
+      setPat('');
+      setStep('pat');
+    }
     setError('');
     sessionStorage.removeItem('generatedCode');
   };
@@ -85,7 +109,20 @@ function Home() {
             />
             <small>Get your PAT from Figma → Settings → Account → Personal access tokens</small>
           </div>
-          <button type="submit" className="button">Next</button>
+          <div className="button-group">
+            <button type="submit" className="button">Next</button>
+            {/* Back to generator button (Phase 3.8 T076) visible only if PAT persisted */}
+            {pat && pat === (():string => { try { return localStorage.getItem('figmaPat') || ''; } catch { return ''; } })() && (
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => setStep('url')}
+                aria-label="Back to generator"
+              >
+                Back to generator
+              </button>
+            )}
+          </div>
         </form>
       )}
 
@@ -105,8 +142,14 @@ function Home() {
             <small>Paste the URL of your Figma file or design</small>
           </div>
           <div className="button-group">
-            <button type="button" onClick={() => setStep('pat')} className="button button-secondary">
-              Back
+            {/* Add PAT button (Phase 3.8 T075) */}
+            <button
+              type="button"
+              onClick={() => setStep('pat')}
+              className="button button-secondary"
+              aria-label="Add PAT"
+            >
+              Add PAT
             </button>
             <button type="submit" className="button" disabled={loading}>
               {loading ? 'Processing...' : 'Generate Code'}
