@@ -77,6 +77,7 @@ As a user viewing a generated page from a Figma design, I want the footer (and s
 - Q: What breakpoint should trigger footer columns to wrap/stack? → A: No breakpoint; never wrap. Horizontal scroll allowed.
 - Q: How should we define column grouping limits? → A: No max; group any ≥2.
 - Q: For failed icon/vector exports, what fallback should appear? → A: Generic monochrome placeholder SVG with accessible label.
+- Q: What is the reference performance environment for timing targets? → A: Mid laptop 4-core/8-thread ~2.4GHz, 16GB RAM.
 
 ## Requirements *(mandatory)*
 
@@ -91,7 +92,7 @@ As a user viewing a generated page from a Figma design, I want the footer (and s
 - **FR-008**: System MUST apply semantic and accessible structure: container recognized as footer section; site title as heading level (h2 unless conflicting); link groups as lists with list items and navigable links; icons with aria-labels.
 - **FR-009**: System MUST correctly resolve color & opacity for text and icons, falling back to inherited parent color before using a high-contrast placeholder.
 - **FR-010**: System MUST de-duplicate identical text style definitions, issuing a single token/class reused across all matching nodes (deterministic naming rules documented separately).
-- **FR-011**: System SHOULD cache normalized style and layout computations so repeated similar nodes do not exceed performance budget (target: added processing < 10ms per column on reference machine). [NEEDS CLARIFICATION: Define reference performance environment].
+- **FR-011**: System SHOULD cache normalized style and layout computations so repeated similar nodes do not exceed performance budget: added processing time < 10ms per column measured on reference environment (4-core/8-thread ~2.4GHz CPU, 16GB RAM, no turbo, single run warm cache).
 - **FR-012**: System MUST provide deterministic output ordering for columns and items across runs given identical Figma input (tested via snapshot determinism).
 - **FR-013**: System MUST expose instrumentation/log entries when grouping detected, skipped, or ambiguous for observability.
 - **FR-014**: System MUST support any number of footer columns (≥2) in a single grouping without enforcing a hard maximum; overflow is handled exclusively via horizontal scrolling (no forced regrouping or truncation).
