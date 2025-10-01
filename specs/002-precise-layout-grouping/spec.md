@@ -72,6 +72,10 @@ As a user viewing a generated page from a Figma design, I want the footer (and s
 - Mixed alignment where only some siblings align: system does not incorrectly group them into a single column set. [NEEDS CLARIFICATION: Minimum grouping threshold?]
 - Overly large number (>8) of potential columns: system may limit to a maximum grouping. [NEEDS CLARIFICATION: Column grouping cap?]
 
+## Clarifications
+### Session 2025-10-01
+- Q: What breakpoint should trigger footer columns to wrap/stack? → A: No breakpoint; never wrap. Horizontal scroll allowed.
+
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
@@ -80,7 +84,7 @@ As a user viewing a generated page from a Figma design, I want the footer (and s
 - **FR-003**: System MUST extract text style properties (font family, weight, size, line height, letter spacing, color, paragraph spacing) into reusable style tokens and reference them instead of rendering generic placeholders.
 - **FR-004**: System MUST render actual text content when a text node has non-empty characters; placeholders (skeleton bars) MUST only appear when a node is empty or explicitly flagged for deferred content.
 - **FR-005**: System MUST extract frame padding (top, right, bottom, left) and inter-column gap and apply these as layout spacing in the rendered footer.
-- **FR-006**: System MUST translate Figma constraints and auto-layout resizing hints into responsive behavior enabling columns to wrap/stack below a defined breakpoint [NEEDS CLARIFICATION: default breakpoint value].
+- **FR-006**: System MUST honor Figma constraints without introducing automatic column wrapping; columns remain on a single horizontal line regardless of viewport width. If the viewport is narrower than total column width, a horizontal scrollbar MUST allow full-width inspection (no internal reflow/wrap).
 - **FR-007**: System MUST export vector/icon nodes in the footer as inline SVG or accessible image elements with descriptive labels derived from layer names.
 - **FR-008**: System MUST apply semantic and accessible structure: container recognized as footer section; site title as heading level (h2 unless conflicting); link groups as lists with list items and navigable links; icons with aria-labels.
 - **FR-009**: System MUST correctly resolve color & opacity for text and icons, falling back to inherited parent color before using a high-contrast placeholder.
