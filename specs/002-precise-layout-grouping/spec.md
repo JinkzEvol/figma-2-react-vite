@@ -78,6 +78,7 @@ As a user viewing a generated page from a Figma design, I want the footer (and s
 - Q: How should we define column grouping limits? → A: No max; group any ≥2.
 - Q: For failed icon/vector exports, what fallback should appear? → A: Generic monochrome placeholder SVG with accessible label.
 - Q: What is the reference performance environment for timing targets? → A: Mid laptop 4-core/8-thread ~2.4GHz, 16GB RAM.
+- Q: What is the color fidelity tolerance policy? → A: Brand colors exact; others ΔE ≤3.
 
 ## Requirements *(mandatory)*
 
@@ -96,7 +97,7 @@ As a user viewing a generated page from a Figma design, I want the footer (and s
 - **FR-012**: System MUST provide deterministic output ordering for columns and items across runs given identical Figma input (tested via snapshot determinism).
 - **FR-013**: System MUST expose instrumentation/log entries when grouping detected, skipped, or ambiguous for observability.
 - **FR-014**: System MUST support any number of footer columns (≥2) in a single grouping without enforcing a hard maximum; overflow is handled exclusively via horizontal scrolling (no forced regrouping or truncation).
-- **FR-015**: System MUST provide a measurable fidelity tolerance: rendered spacing and font sizes within ±1px of Figma values; colors within ΔE < 2 (or exact hex if no conversion needed). [NEEDS CLARIFICATION: Color tolerance metric acceptance].
+- **FR-015**: System MUST provide measurable fidelity tolerance: spacing & font sizes within ±1px of Figma; brand palette colors (as identified in design tokens) exact hex match; all other colors ΔE ≤ 3 using CIEDE2000.
 
 ### Key Entities *(include if feature involves data)*
 - **FooterSection**: Represents an extracted multi-column grouping of related footer content. Attributes: columns[], padding, gap, breakpoint policy, semantic role.
@@ -105,9 +106,7 @@ As a user viewing a generated page from a Figma design, I want the footer (and s
 - **IconAsset**: Exported representation of a vector/icon with name, accessible label, svg content reference.
 - **InstrumentationEvent**: Logging entity capturing decisions (group_detected, group_skipped_reason, style_dedup_applied, icon_export_failed).
 
-### Key Entities *(include if feature involves data)*
-- **[Entity 1]**: [What it represents, key attributes without implementation]
-- **[Entity 2]**: [What it represents, relationships to other entities]
+<!-- Placeholder Key Entities section removed after clarifications to avoid confusion -->
 
 ---
 
