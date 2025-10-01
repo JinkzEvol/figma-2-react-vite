@@ -63,13 +63,13 @@ As a user viewing a generated page from a Figma design, I want the footer (and s
 2. **Given** text nodes in the footer with actual characters, **When** the preview renders, **Then** the real text appears with proper font size, weight, color, and line height instead of generic black bar placeholders.
 3. **Given** social media vector/icon nodes in the design, **When** rendered, **Then** recognizable icons (inline SVG or equivalent) appear with accessible labels and not empty rectangles.
 4. **Given** a footer frame with internal padding and gaps, **When** rendered, **Then** horizontal and vertical spacing matches Figma within defined tolerance (see Requirements) and total footer height is not inflated by placeholder stacking.
-5. **Given** the viewport is narrowed below a responsive breakpoint, **When** columns cannot fit horizontally, **Then** they wrap or stack in a predictable order while preserving intra-column spacing.
+5. **Given** the viewport width becomes narrower than the total column width, **When** the user views the footer, **Then** all columns remain in a single horizontal row and a horizontal scrollbar allows full inspection without any column wrapping.
 
 ### Edge Cases
-- Extremely small viewport width causes columns to stack: footer still readable and spacing consistent.
+- Extremely narrow viewport: user horizontally scrolls; no column wrapping occurs.
 - Missing or empty text nodes: skeleton placeholders display only for those nodes, not replacing populated siblings.
 - Icon export failure: system displays a generic monochrome placeholder SVG sized to original node with accessible label (from layer name) and logs the failure event.
-- Mixed alignment where only some siblings align: system does not incorrectly group them into a single column set. [NEEDS CLARIFICATION: Minimum grouping threshold?]
+- Mixed alignment where only some siblings align: system does not incorrectly group them into a column set if fewer than 2 aligned siblings meet grouping heuristics.
 - Very large number of columns still forms a single horizontal group (no hard maximum) and relies on horizontal scrolling for visibility.
 
 ## Clarifications
@@ -79,6 +79,7 @@ As a user viewing a generated page from a Figma design, I want the footer (and s
 - Q: For failed icon/vector exports, what fallback should appear? → A: Generic monochrome placeholder SVG with accessible label.
 - Q: What is the reference performance environment for timing targets? → A: Mid laptop 4-core/8-thread ~2.4GHz, 16GB RAM.
 - Q: What is the color fidelity tolerance policy? → A: Brand colors exact; others ΔE ≤3.
+- Q: What is the minimum grouping threshold? → A: 2 aligned sibling groups (≥2) required; otherwise skip grouping.
 
 ## Requirements *(mandatory)*
 
@@ -87,17 +88,17 @@ As a user viewing a generated page from a Figma design, I want the footer (and s
 - **FR-002**: System MUST represent a detected column grouping as a semantic container (multi-column footer section) with an ordered list of columns preserving original left-to-right order.
 - **FR-003**: System MUST extract text style properties (font family, weight, size, line height, letter spacing, color, paragraph spacing) into reusable style tokens and reference them instead of rendering generic placeholders.
 - **FR-004**: System MUST render actual text content when a text node has non-empty characters; placeholders (skeleton bars) MUST only appear when a node is empty or explicitly flagged for deferred content.
-- **FR-005**: System MUST extract frame padding (top, right, bottom, left) and inter-column gap and apply these as layout spacing in the rendered footer.
+- **FR-005**: System MUST extract frame padding (top, right, bottom, left) and inter-column gap and apply these as layout spacing in the rendered footer (applied within ±1px tolerance).
 - **FR-006**: System MUST honor Figma constraints without introducing automatic column wrapping; columns remain on a single horizontal line regardless of viewport width. If the viewport is narrower than total column width, a horizontal scrollbar MUST allow full-width inspection (no internal reflow/wrap).
 - **FR-007**: System MUST export vector/icon nodes in the footer as inline SVG or accessible image elements with descriptive labels derived from layer names; on export failure it MUST render a generic monochrome placeholder SVG (maintaining size) with the same accessible label and log the failure.
 - **FR-008**: System MUST apply semantic and accessible structure: container recognized as footer section; site title as heading level (h2 unless conflicting); link groups as lists with list items and navigable links; icons with aria-labels.
 - **FR-009**: System MUST correctly resolve color & opacity for text and icons, falling back to inherited parent color before using a high-contrast placeholder.
 - **FR-010**: System MUST de-duplicate identical text style definitions, issuing a single token/class reused across all matching nodes (deterministic naming rules documented separately).
-- **FR-011**: System SHOULD cache normalized style and layout computations so repeated similar nodes do not exceed performance budget: added processing time < 10ms per column measured on reference environment (4-core/8-thread ~2.4GHz CPU, 16GB RAM, no turbo, single run warm cache).
+- **FR-011**: System SHOULD cache normalized style and layout computations so repeated similar nodes do not exceed performance budget: median added processing time < 10ms per column across 3 consecutive warm runs on reference environment (4-core/8-thread ~2.4GHz CPU, frequency scaling minimized).
 - **FR-012**: System MUST provide deterministic output ordering for columns and items across runs given identical Figma input (tested via snapshot determinism).
 - **FR-013**: System MUST expose instrumentation/log entries when grouping detected, skipped, or ambiguous for observability.
 - **FR-014**: System MUST support any number of footer columns (≥2) in a single grouping without enforcing a hard maximum; overflow is handled exclusively via horizontal scrolling (no forced regrouping or truncation).
-- **FR-015**: System MUST provide measurable fidelity tolerance: spacing & font sizes within ±1px of Figma; brand palette colors (as identified in design tokens) exact hex match; all other colors ΔE ≤ 3 using CIEDE2000.
+- **FR-015**: System MUST provide measurable fidelity tolerance: spacing & font sizes within ±1px of Figma; brand palette colors (as identified in design tokens) exact hex match; all other colors ΔE ≤ 3 using CIEDE2000 (tested via color fidelity contract tasks).
 
 ### Key Entities *(include if feature involves data)*
 - **FooterSection**: Represents an extracted multi-column grouping of related footer content. Attributes: columns[], padding, gap, breakpoint policy, semantic role.

@@ -71,7 +71,6 @@ specs/[###-feature]/
 └── tasks.md             # Phase 2 output (/tasks command - NOT created by /plan)
 ```
 
-ios/ or android/
 ### Source Code (repository root)
 ```
 src/
@@ -92,6 +91,8 @@ New/updated modules (planned):
 - `src/styles/styleTokenRegistry.ts` (dedupe + token naming)
 - `src/icons/exportIcon.ts` (inline SVG + fallback)
 - `src/logging/events.ts` (extend instrumentation enums)
+
+Contracts alignment note: Logging events contract (grouping_detected, grouping_skipped, token_dedup_applied, icon_export_failed, performance_sample) informs assertions in tasks T008 & T026.
 
 **Structure Decision**: Extend single project; add small focused modules under new directories (`grouping/`, potential `icons/`) to keep architecture lean.
 

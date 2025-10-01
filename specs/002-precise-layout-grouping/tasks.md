@@ -64,7 +64,7 @@ T012 Integration Story Test: Icon rendering + fallback (Scenario #3) verifying i
 T013 [P] Implement Style Token Registry `src/styles/styleTokenRegistry.ts` (dedupe, deterministic naming, hash fallback) (FR-003, FR-010).
 - Depends: T005
 
-T014 Integration Story Test: Padding & gap fidelity (Scenario #4) asserting ±1px tolerance and no height inflation.
+T014 Integration Story Test: Padding & gap fidelity (Scenario #4) asserting ±1px tolerance and no height inflation (FR-005).
 - Depends: T011
 
 T015 [P] Implement Icon Export `src/icons/exportIcon.ts` with fallback placeholder logic + label normalization (FR-007).
@@ -76,31 +76,31 @@ T016 Integration Story Test: Non-wrapping horizontal overflow & scrollbar presen
 T017 [P] Extend Logging Events `src/logging/events.ts` + integrate calls in grouping, token, icon code (FR-013).
 - Depends: T011,T013,T015
 
-T018 Integrate Style Tokens into Code Generation (`src/codeGenerator.ts`), replacing placeholder bars with real text (FR-003, FR-004).
+T018 Integrate Style Tokens into Code Generation (`src/codeGenerator.ts`), replacing placeholder bars with real text (FR-003, FR-004, FR-009 color/opacity fallback).
 - Depends: T013
 
 T019 Integrate Icon Export & Fallback in Code Generation + add ARIA labels (FR-007, FR-008).
 - Depends: T015
 
-T020 [P] Performance Harness Update: Add column scaling test (12 & 20 columns) collecting ms/column and asserting <10ms (FR-011, Performance Principle #4).
+T020 [P] Performance Harness Update: Add column scaling test (12 & 20 columns) run 3 warm runs; assert median ms/column <10; record distribution & log performance_sample event (FR-011, Performance Principle #4).
 - Depends: T011,T013
 
-T021 [P] Color Fidelity Utility & Tests: Implement CIEDE2000 and brand exactness enforcement; connect to integration tests (FR-015).
+T021 [P] Color Fidelity Utility & Tests: Implement CIEDE2000 and brand exactness enforcement; verify brand palette exact hex & opacity inheritance fallback (FR-015, FR-009).
 - Depends: T007
 
-T022 [P] Accessibility Assertions: Add test ensuring icons have accessible labels & heading structure present (FR-008).
+T022 [P] Accessibility Assertions: Assert icons have accessible labels (normalization kebab→sentence case), heading hierarchy, list semantics (<ul>/<li>), and logical focus order (tab sequence left→right) (FR-008).
 - Depends: T012,T019
 
-T023 Deterministic Ordering Enforcement: Add snapshot/determinism test for repeated runs same Figma input (FR-012, Determinism Principle #2).
+T023 Deterministic Ordering Enforcement: Run 3 consecutive generation cycles with identical input; assert snapshots identical (FR-012, Determinism Principle #2).
 - Depends: T011,T013,T015
 
 T024 Integrate Non-Wrapping Overflow Behavior in Preview component with horizontal scroll styling (FR-006) and update integration snapshots.
 - Depends: T016
 
-T025 Final Integration: Combine style token + icon + logging updates, run full test suite, resolve any snapshot updates.
+T025 Final Integration: Combine style token + icon + logging updates, run full test suite, resolve any snapshot updates (no new logic) (FR-003, FR-004, FR-007, FR-008, FR-009, FR-013).
 - Depends: T018,T019,T017
 
-T026 Observability Validation: Add tests asserting logging events emitted with expected payload counts (FR-013).
+T026 Observability Validation: Assert logging events emitted with expected payload counts including performance_sample (msPerColumn), timestamp (ts), and absence of grouping_skipped when grouping succeeds (FR-013).
 - Depends: T017
 
 T027 Cleanup & Refactor Pass: Remove TODOs, ensure purity of functions, run lint & type checks (Clarity & Lean Architecture Principles).
@@ -115,12 +115,18 @@ T029 Performance Re-Verification: Re-run harness capturing metrics artifact; upd
 T030 Final Gate Review: Ensure all FRs mapped to tests, update plan progress (Phase 2 & Post-Design Constitution Check PASS), prepare PR description referencing FR IDs.
 - Depends: T028,T029
 
+T031 Large Column Functional Test: Create scenario with ≥20 columns verifying semantic container, scroll behavior, absence of wrapping, and consistent ordering (FR-014, FR-006, FR-012 linkage).
+- Depends: T011,T020
+
 ---
 ## Mapping Summary
 - Contracts → T004–T008
 - Entities (FooterSection, FooterColumn, TextStyleToken, IconAsset, InstrumentationEvent) represented via implementation tasks T011, T013, T015, T017
 - User Stories (5 acceptance scenarios) covered by T009, T010, T012, T014, T016
+- Padding & Gap (FR-005) → T014
+- Color & Opacity (FR-009) → T018, T021
+- Unlimited Columns (FR-014) → T031 (functional) & T020 (performance)
 - Non-functional: Performance (T020,T029), Determinism (T023), Accessibility (T022), Observability (T026), Color fidelity (T021)
 
 ## Completion Criteria
-All tasks T001–T030 complete, all tests green, performance & determinism thresholds satisfied, docs updated, PR ready.
+All tasks T001–T031 complete; every FR explicitly referenced by ≥1 task; 3-run determinism test green; median perf <10ms/column; accessibility semantics (labels, lists, focus) validated; large-column scenario passes; color & opacity fidelity rules enforced; logging events (including performance_sample with ts) verified; docs updated; PR ready.
