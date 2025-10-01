@@ -68,7 +68,7 @@ As a user viewing a generated page from a Figma design, I want the footer (and s
 ### Edge Cases
 - Extremely small viewport width causes columns to stack: footer still readable and spacing consistent.
 - Missing or empty text nodes: skeleton placeholders display only for those nodes, not replacing populated siblings.
-- Icon export failure: system falls back to a labeled text link placeholder (e.g., "Icon: Facebook") rather than a blank box. [NEEDS CLARIFICATION: Should fallback show text label or generic icon glyph?]
+- Icon export failure: system displays a generic monochrome placeholder SVG sized to original node with accessible label (from layer name) and logs the failure event.
 - Mixed alignment where only some siblings align: system does not incorrectly group them into a single column set. [NEEDS CLARIFICATION: Minimum grouping threshold?]
 - Very large number of columns still forms a single horizontal group (no hard maximum) and relies on horizontal scrolling for visibility.
 
@@ -76,6 +76,7 @@ As a user viewing a generated page from a Figma design, I want the footer (and s
 ### Session 2025-10-01
 - Q: What breakpoint should trigger footer columns to wrap/stack? → A: No breakpoint; never wrap. Horizontal scroll allowed.
 - Q: How should we define column grouping limits? → A: No max; group any ≥2.
+- Q: For failed icon/vector exports, what fallback should appear? → A: Generic monochrome placeholder SVG with accessible label.
 
 ## Requirements *(mandatory)*
 
@@ -86,7 +87,7 @@ As a user viewing a generated page from a Figma design, I want the footer (and s
 - **FR-004**: System MUST render actual text content when a text node has non-empty characters; placeholders (skeleton bars) MUST only appear when a node is empty or explicitly flagged for deferred content.
 - **FR-005**: System MUST extract frame padding (top, right, bottom, left) and inter-column gap and apply these as layout spacing in the rendered footer.
 - **FR-006**: System MUST honor Figma constraints without introducing automatic column wrapping; columns remain on a single horizontal line regardless of viewport width. If the viewport is narrower than total column width, a horizontal scrollbar MUST allow full-width inspection (no internal reflow/wrap).
-- **FR-007**: System MUST export vector/icon nodes in the footer as inline SVG or accessible image elements with descriptive labels derived from layer names.
+- **FR-007**: System MUST export vector/icon nodes in the footer as inline SVG or accessible image elements with descriptive labels derived from layer names; on export failure it MUST render a generic monochrome placeholder SVG (maintaining size) with the same accessible label and log the failure.
 - **FR-008**: System MUST apply semantic and accessible structure: container recognized as footer section; site title as heading level (h2 unless conflicting); link groups as lists with list items and navigable links; icons with aria-labels.
 - **FR-009**: System MUST correctly resolve color & opacity for text and icons, falling back to inherited parent color before using a high-contrast placeholder.
 - **FR-010**: System MUST de-duplicate identical text style definitions, issuing a single token/class reused across all matching nodes (deterministic naming rules documented separately).
