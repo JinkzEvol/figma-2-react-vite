@@ -1,0 +1,136 @@
+# Feature Specification: Footer Fidelity & Extraction Improvements
+
+**Feature Branch**: `002-precise-layout-grouping`  
+**Created**: 2025-10-01  
+**Status**: Draft  
+**Input**: User description: "Precise layout & grouping; text style fidelity tokens; real text vs placeholders; padding & spacing; constraints to responsive CSS; icon vector export; semantic footer structure & a11y; color & opacity fidelity; style dedupe reuse; performance & determinism improvements"
+
+## Execution Flow (main)
+```
+1. Parse user description from Input
+   → If empty: ERROR "No feature description provided"
+2. Extract key concepts from description
+   → Identify: actors, actions, data, constraints
+3. For each unclear aspect:
+   → Mark with [NEEDS CLARIFICATION: specific question]
+4. Fill User Scenarios & Testing section
+   → If no clear user flow: ERROR "Cannot determine user scenarios"
+5. Generate Functional Requirements
+   → Each requirement must be testable
+   → Mark ambiguous requirements
+6. Identify Key Entities (if data involved)
+7. Run Review Checklist
+   → If any [NEEDS CLARIFICATION]: WARN "Spec has uncertainties"
+   → If implementation details found: ERROR "Remove tech details"
+8. Return: SUCCESS (spec ready for planning)
+```
+
+---
+
+## ⚡ Quick Guidelines
+- ✅ Focus on WHAT users need and WHY
+- ❌ Avoid HOW to implement (no tech stack, APIs, code structure)
+- 👥 Written for business stakeholders, not developers
+ - 🎯 Align with Constitution principles: Test-First Fidelity, Deterministic Output, Lean Architecture, Performance Budget, Transparent Observability, Explicit Scope, Clarity.
+
+### Section Requirements
+- **Mandatory sections**: Must be completed for every feature
+- **Optional sections**: Include only when relevant to the feature
+- When a section doesn't apply, remove it entirely (don't leave as "N/A")
+
+### For AI Generation
+When creating this spec from a user prompt:
+1. **Mark all ambiguities**: Use [NEEDS CLARIFICATION: specific question] for any assumption you'd need to make
+2. **Don't guess**: If the prompt doesn't specify something (e.g., "login system" without auth method), mark it
+3. **Think like a tester**: Every vague requirement should fail the "testable and unambiguous" checklist item
+4. **Common underspecified areas**:
+   - User types and permissions
+   - Data retention/deletion policies  
+   - Performance targets and scale
+   - Error handling behaviors
+   - Integration requirements
+   - Security/compliance needs
+
+---
+
+## User Scenarios & Testing *(mandatory)*
+
+### Primary User Story
+As a user viewing a generated page from a Figma design, I want the footer (and similar multi-column structured sections) to reflect accurate layout, spacing, text content, icons, and hierarchy so I can visually validate design fidelity without manual code edits.
+
+### Acceptance Scenarios
+1. **Given** a Figma frame containing horizontally aligned groups forming a footer with consistent top alignment and even spacing, **When** the system extracts and renders it, **Then** the preview shows a multi-column footer with correct column count, preserved order, and reduced vertical whitespace (no large placeholder blocks).
+2. **Given** text nodes in the footer with actual characters, **When** the preview renders, **Then** the real text appears with proper font size, weight, color, and line height instead of generic black bar placeholders.
+3. **Given** social media vector/icon nodes in the design, **When** rendered, **Then** recognizable icons (inline SVG or equivalent) appear with accessible labels and not empty rectangles.
+4. **Given** a footer frame with internal padding and gaps, **When** rendered, **Then** horizontal and vertical spacing matches Figma within defined tolerance (see Requirements) and total footer height is not inflated by placeholder stacking.
+5. **Given** the viewport is narrowed below a responsive breakpoint, **When** columns cannot fit horizontally, **Then** they wrap or stack in a predictable order while preserving intra-column spacing.
+
+### Edge Cases
+- Extremely small viewport width causes columns to stack: footer still readable and spacing consistent.
+- Missing or empty text nodes: skeleton placeholders display only for those nodes, not replacing populated siblings.
+- Icon export failure: system falls back to a labeled text link placeholder (e.g., "Icon: Facebook") rather than a blank box. [NEEDS CLARIFICATION: Should fallback show text label or generic icon glyph?]
+- Mixed alignment where only some siblings align: system does not incorrectly group them into a single column set. [NEEDS CLARIFICATION: Minimum grouping threshold?]
+- Overly large number (>8) of potential columns: system may limit to a maximum grouping. [NEEDS CLARIFICATION: Column grouping cap?]
+
+## Requirements *(mandatory)*
+
+### Functional Requirements
+- **FR-001**: System MUST detect candidate column groupings when ≥2 sibling groups share (a) identical top Y within tolerance (≤2px), (b) consistent horizontal gaps within ±4px variance, and (c) similar vertical internal structure.
+- **FR-002**: System MUST represent a detected column grouping as a semantic container (multi-column footer section) with an ordered list of columns preserving original left-to-right order.
+- **FR-003**: System MUST extract text style properties (font family, weight, size, line height, letter spacing, color, paragraph spacing) into reusable style tokens and reference them instead of rendering generic placeholders.
+- **FR-004**: System MUST render actual text content when a text node has non-empty characters; placeholders (skeleton bars) MUST only appear when a node is empty or explicitly flagged for deferred content.
+- **FR-005**: System MUST extract frame padding (top, right, bottom, left) and inter-column gap and apply these as layout spacing in the rendered footer.
+- **FR-006**: System MUST translate Figma constraints and auto-layout resizing hints into responsive behavior enabling columns to wrap/stack below a defined breakpoint [NEEDS CLARIFICATION: default breakpoint value].
+- **FR-007**: System MUST export vector/icon nodes in the footer as inline SVG or accessible image elements with descriptive labels derived from layer names.
+- **FR-008**: System MUST apply semantic and accessible structure: container recognized as footer section; site title as heading level (h2 unless conflicting); link groups as lists with list items and navigable links; icons with aria-labels.
+- **FR-009**: System MUST correctly resolve color & opacity for text and icons, falling back to inherited parent color before using a high-contrast placeholder.
+- **FR-010**: System MUST de-duplicate identical text style definitions, issuing a single token/class reused across all matching nodes (deterministic naming rules documented separately).
+- **FR-011**: System SHOULD cache normalized style and layout computations so repeated similar nodes do not exceed performance budget (target: added processing < 10ms per column on reference machine). [NEEDS CLARIFICATION: Define reference performance environment].
+- **FR-012**: System MUST provide deterministic output ordering for columns and items across runs given identical Figma input (tested via snapshot determinism).
+- **FR-013**: System MUST expose instrumentation/log entries when grouping detected, skipped, or ambiguous for observability.
+- **FR-014**: System MUST enforce a maximum columns limit to prevent layout overflow [NEEDS CLARIFICATION: proposed default 6?].
+- **FR-015**: System MUST provide a measurable fidelity tolerance: rendered spacing and font sizes within ±1px of Figma values; colors within ΔE < 2 (or exact hex if no conversion needed). [NEEDS CLARIFICATION: Color tolerance metric acceptance].
+
+### Key Entities *(include if feature involves data)*
+- **FooterSection**: Represents an extracted multi-column grouping of related footer content. Attributes: columns[], padding, gap, breakpoint policy, semantic role.
+- **FooterColumn**: Represents a vertical collection of related nodes (text items, icons). Attributes: order index, items[], deduped style references.
+- **TextStyleToken**: Logical style descriptor created from one or more Figma text nodes sharing identical style properties.
+- **IconAsset**: Exported representation of a vector/icon with name, accessible label, svg content reference.
+- **InstrumentationEvent**: Logging entity capturing decisions (group_detected, group_skipped_reason, style_dedup_applied, icon_export_failed).
+
+### Key Entities *(include if feature involves data)*
+- **[Entity 1]**: [What it represents, key attributes without implementation]
+- **[Entity 2]**: [What it represents, relationships to other entities]
+
+---
+
+## Review & Acceptance Checklist
+*GATE: Automated checks run during main() execution*
+
+### Content Quality
+- [ ] No implementation details (languages, frameworks, APIs)
+- [ ] Focused on user value and business needs
+- [ ] Written for non-technical stakeholders
+- [ ] All mandatory sections completed
+
+### Requirement Completeness
+- [ ] No [NEEDS CLARIFICATION] markers remain
+- [ ] Requirements are testable and unambiguous  
+- [ ] Success criteria are measurable
+- [ ] Scope is clearly bounded
+- [ ] Dependencies and assumptions identified
+
+---
+
+## Execution Status
+*Updated by main() during processing*
+
+- [ ] User description parsed
+- [ ] Key concepts extracted
+- [ ] Ambiguities marked
+- [ ] User scenarios defined
+- [ ] Requirements generated
+- [ ] Entities identified
+- [ ] Review checklist passed
+
+---
