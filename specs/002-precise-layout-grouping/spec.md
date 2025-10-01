@@ -70,11 +70,12 @@ As a user viewing a generated page from a Figma design, I want the footer (and s
 - Missing or empty text nodes: skeleton placeholders display only for those nodes, not replacing populated siblings.
 - Icon export failure: system falls back to a labeled text link placeholder (e.g., "Icon: Facebook") rather than a blank box. [NEEDS CLARIFICATION: Should fallback show text label or generic icon glyph?]
 - Mixed alignment where only some siblings align: system does not incorrectly group them into a single column set. [NEEDS CLARIFICATION: Minimum grouping threshold?]
-- Overly large number (>8) of potential columns: system may limit to a maximum grouping. [NEEDS CLARIFICATION: Column grouping cap?]
+- Very large number of columns still forms a single horizontal group (no hard maximum) and relies on horizontal scrolling for visibility.
 
 ## Clarifications
 ### Session 2025-10-01
 - Q: What breakpoint should trigger footer columns to wrap/stack? → A: No breakpoint; never wrap. Horizontal scroll allowed.
+- Q: How should we define column grouping limits? → A: No max; group any ≥2.
 
 ## Requirements *(mandatory)*
 
@@ -92,7 +93,7 @@ As a user viewing a generated page from a Figma design, I want the footer (and s
 - **FR-011**: System SHOULD cache normalized style and layout computations so repeated similar nodes do not exceed performance budget (target: added processing < 10ms per column on reference machine). [NEEDS CLARIFICATION: Define reference performance environment].
 - **FR-012**: System MUST provide deterministic output ordering for columns and items across runs given identical Figma input (tested via snapshot determinism).
 - **FR-013**: System MUST expose instrumentation/log entries when grouping detected, skipped, or ambiguous for observability.
-- **FR-014**: System MUST enforce a maximum columns limit to prevent layout overflow [NEEDS CLARIFICATION: proposed default 6?].
+- **FR-014**: System MUST support any number of footer columns (≥2) in a single grouping without enforcing a hard maximum; overflow is handled exclusively via horizontal scrolling (no forced regrouping or truncation).
 - **FR-015**: System MUST provide a measurable fidelity tolerance: rendered spacing and font sizes within ±1px of Figma values; colors within ΔE < 2 (or exact hex if no conversion needed). [NEEDS CLARIFICATION: Color tolerance metric acceptance].
 
 ### Key Entities *(include if feature involves data)*
