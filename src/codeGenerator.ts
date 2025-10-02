@@ -1,6 +1,10 @@
 import type { FigmaNode } from './types';
+import { buildStyleTokenRegistry, type TextStyleDescriptor } from './styles/styleTokenRegistry';
+import { exportIcon, type IconNode } from './icons/exportIcon';
+import { logPerformanceSample } from './logging/events';
 import { extractAllStyles } from './styleExtractors';
 import type { DesignNode } from './ir/buildIR';
+import { BRAND_PALETTE, NEUTRAL_COLOR, PLACEHOLDER_COLOR } from './styles/brandPalette';
 
 function cssObjToInlineString(obj: Record<string, string | number | undefined>): string {
   return Object.entries(obj)
@@ -79,7 +83,56 @@ function camelCase(prop: string): string {
 // capturing text content, inline style (including white-space & opacity), and layout.
 export function generateCodeFromIR(ir: DesignNode | null | undefined): string {
   if (!ir) return '';
-  function styleFor(node: DesignNode): Record<string,string> {
+  const start = Date.now();
+  // Brand & neutral colors centralized in brandPalette.ts (FR-015)
+
+  function rgbaToHex(rgba?: string): string | null {
+    if (!rgba) return null;
+    const m = /rgba?\(([^)]+)\)/.exec(rgba);
+    if (!m) return null;
+    const parts = m[1].split(/\s*,\s*/).map(p=>+p);
+    const [r,g,b] = parts;
+    if ([r,g,b].some(x=>Number.isNaN(x))) return null;
+    const hex = '#' + [r,g,b].map(v=> v.toString(16).padStart(2,'0')).join('');
+    return hex.toLowerCase();
+  }
+  function resolveTextColor(node: DesignNode, ancestorColor?: string): string {
+    // Fallback chain: node explicit -> ancestor -> first brand -> neutral -> placeholder
+    const explicit = node.text?.color && (rgbaToHex(node.text.color) || node.text.color);
+    return (explicit as string) || ancestorColor || BRAND_PALETTE[0] || NEUTRAL_COLOR || PLACEHOLDER_COLOR;
+  }
+  function effectiveOpacity(node: DesignNode, parentOpacity: number): number {
+    const own = typeof node.opacity === 'number' ? node.opacity : 1;
+    return +(parentOpacity * own).toFixed(3);
+  }
+  function traverse(node: DesignNode, fn:(n:DesignNode)=>void) {
+    fn(node);
+    if (node.children) for (const c of node.children) traverse(c, fn);
+  }
+  // Collect text styles deterministically (pre-order traversal)
+  const textStyles: TextStyleDescriptor[] = [];
+  const icons: IconNode[] = [];
+  traverse(ir, n => {
+    if (n.text) {
+      const colorResolved = resolveTextColor(n);
+  const hex = (rgbaToHex(colorResolved) || colorResolved || NEUTRAL_COLOR).toLowerCase();
+      textStyles.push({
+        fontFamily: n.text.fontFamily || 'sans-serif',
+        weight: n.text.fontWeight || 400,
+        size: n.text.fontSize || 14,
+        lineHeight: n.text.lineHeight || (n.text.fontSize ? n.text.fontSize * 1.2 : 16),
+        letterSpacing: n.text.letterSpacing || 0,
+        colorHex: hex,
+        paragraphSpacing: 0
+      });
+    }
+    if (n.name && /icon/i.test(n.name) && !n.text) {
+      icons.push({ id: n.id, name: n.name, width: n.width || 16, height: n.height || 16, vectorData: { paths: [1] } });
+    }
+  });
+  const tokenRegistry = buildStyleTokenRegistry(textStyles);
+  const iconExports = icons.map(i => exportIcon(i));
+  function styleFor(node: DesignNode, inherited: { color?: string; opacity: number }): Record<string,string> {
     const s: Record<string,string> = {};
     if (node.width) s.width = node.width + 'px';
     if (node.height) s.height = node.height + 'px';
@@ -99,11 +152,12 @@ export function generateCodeFromIR(ir: DesignNode | null | undefined): string {
       }).join(', ');
     }
     if (node.effects?.blur) s.filter = `blur(${node.effects.blur}px)`;
+    const resolvedColor = resolveTextColor(node, inherited.color);
     if (node.text) {
       if (node.text.fontFamily) s.fontFamily = node.text.fontFamily;
       if (node.text.fontSize) s.fontSize = node.text.fontSize + 'px';
       if (node.text.fontWeight) s.fontWeight = String(node.text.fontWeight);
-      if (node.text.color) s.color = node.text.color;
+      s.color = resolvedColor;
       if (node.text.lineHeight) s.lineHeight = node.text.lineHeight + 'px';
       if (node.text.letterSpacing) s.letterSpacing = node.text.letterSpacing + 'px';
       if (node.text.textAlign) s.textAlign = node.text.textAlign;
@@ -111,18 +165,45 @@ export function generateCodeFromIR(ir: DesignNode | null | undefined): string {
       s.whiteSpace = 'pre-wrap';
       s.wordBreak = 'break-word';
     }
-    if (typeof node.opacity === 'number') {
-      s.opacity = node.opacity.toString();
-    }
+    const effOpacity = effectiveOpacity(node, inherited.opacity);
+    if (effOpacity < 1) s.opacity = effOpacity.toString();
     return s;
   }
-  function emit(node: DesignNode, level = 0): string {
+  function emit(node: DesignNode, level = 0, inherited: { color?: string; opacity: number } = { color: undefined, opacity: 1 }): string {
     const indent = '  '.repeat(level);
-    const styleObj = styleFor(node);
+    const styleObj = styleFor(node, inherited);
+    // Apply token class if applicable
+    let tokenClass = '';
+    if (node.text) {
+      const sigCandidate: TextStyleDescriptor = {
+        fontFamily: node.text.fontFamily || 'sans-serif',
+        weight: node.text.fontWeight || 400,
+        size: node.text.fontSize || 14,
+        lineHeight: node.text.lineHeight || (node.text.fontSize ? node.text.fontSize*1.2 : 16),
+        letterSpacing: node.text.letterSpacing || 0,
+  colorHex: rgbaToHex(styleObj.color) || styleObj.color || NEUTRAL_COLOR,
+        paragraphSpacing: 0
+      };
+      const sig = ['fontFamily','weight','size','lineHeight','letterSpacing','colorHex','paragraphSpacing']
+        .map(k=>`${k}:${(sigCandidate as any)[k] ?? ''}`).join('|');
+      const name = tokenRegistry.map[sig];
+      if (name) tokenClass = name;
+    }
+    // Icon injection
+    let iconMarkup = '';
+    const iconMatch = iconExports.find(i => i.id === node.id);
+    if (iconMatch) {
+      if (iconMatch.fallback) {
+        iconMarkup = `<span role="img" aria-label="${iconMatch.label}">□</span>`;
+      } else {
+        iconMarkup = iconMatch.svg || '';
+      }
+    }
     if (node.text?.characters && /\S/.test(node.text.characters) === false) {
       // keep whitespace only text as-is
     }
-    const children = node.children?.map(c => emit(c, level + 1)) || [];
+  const nextInherited = { color: styleObj.color || inherited.color, opacity: +( (inherited.opacity) * (typeof node.opacity === 'number' ? node.opacity : 1) ).toFixed(3) };
+  const children = node.children?.map(c => emit(c, level + 1, nextInherited)) || [];
   const textChild = node.text?.characters ? `, '${node.text.characters.replace(/'/g, "\\'")}'` : (children.length ? '' : '');
     let childrenBlock = '';
     if (children.length) {
@@ -135,20 +216,23 @@ export function generateCodeFromIR(ir: DesignNode | null | undefined): string {
       const esc = v.replace(/'/g, "\\'");
       return `${cssKey}: '${esc}'`;
     }).join(', ');
-    return `${indent}createElement('div', { style: { ${styleSerialized} }${node.placeholder ? `, role: '${node.placeholder.role}', ariaLabel: '${node.placeholder.ariaLabel}'` : ''}}${textChild}${childrenBlock})`;
+    const classProp = tokenClass ? `, className: '${tokenClass}'` : '';
+    const iconProp = iconMarkup ? `, icon: ${JSON.stringify(iconMarkup)}` : '';
+    return `${indent}createElement('div', { style: { ${styleSerialized} }${classProp}${iconProp}${node.placeholder ? `, role: '${node.placeholder.role}', ariaLabel: '${node.placeholder.ariaLabel}'` : ''}}${textChild}${childrenBlock})`;
   }
-  return emit(ir);
+  const out = emit(ir);
+  const dur = Date.now() - start;
+  // Rough msPerColumn: treat top-level children as columns heuristic
+  const columns = ir.children ? ir.children.length : 1;
+  logPerformanceSample('footer', columns, +(dur/columns).toFixed(2));
+  return out;
 }
 
-// Expose globals in test environment (vitest uses node env with globals flag)
-// so that declaration-based tests can call generateCodeFromIR without importing.
-// This is a light shim; in real app you'd import explicitly.
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-if (typeof global !== 'undefined' && !(global as any).generateCodeFromIR) {
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore
-  (global as any).generateCodeFromIR = generateCodeFromIR;
+// Expose globals in test environment (vitest) via ambient declarations (see global.d.ts)
+if (typeof global !== 'undefined') {
+  const g = global as Record<string, unknown>;
+  if (!g.generateCodeFromIR) g.generateCodeFromIR = generateCodeFromIR;
+  if (!g.buildStyleTokenRegistry) g.buildStyleTokenRegistry = buildStyleTokenRegistry;
 }
 
 // === React Component Source Generator (T047) ===
@@ -199,11 +283,47 @@ export function generateReactComponentSource(ir: DesignNode | null | undefined, 
       return typeof v === 'number' ? `${k}: ${v}` : `${k}: '${(v as string).replace(/'/g,"\\'")}'`;
     }).join(', ');
   }
+  function semanticTag(node: DesignNode): string {
+    // Heuristic: root named Footer => footer landmark
+    if (/footer/i.test(node.name) && !node.text) return 'footer';
+    // Text nodes become spans
+    if (node.text) return 'span';
+    return 'div';
+  }
+  function isColumnContainer(node: DesignNode): boolean {
+    // column if vertical layout with text children
+    return !!(node.layout && node.layout.direction === 'column' && node.children && node.children.some(c=>!!c.text));
+  }
+  function isHeading(node: DesignNode): boolean {
+    // name convention: ends with -heading OR first text child inside a column
+    if (!node.text) return false;
+    if (/-heading$/i.test(node.name)) return true;
+    return false;
+  }
   function emit(node: DesignNode): string {
     const styleBlock = serializeStyle(styleFor(node));
+    const tag = semanticTag(node);
     const roleAria = node.placeholder ? ` role=\"${node.placeholder.role}\" aria-label=\"${node.placeholder.ariaLabel}\"` : '';
-    const tag = node.text ? 'span' : 'div';
-    const children = node.children?.map(c => emit(c)) || [];
+    // If this is a column container, group its text children under a list
+    let children: string[] = [];
+    if (node.children) {
+      if (isColumnContainer(node)) {
+        const items: string[] = [];
+        for (const c of node.children) {
+          if (c.text) {
+            const heading = isHeading(c);
+            const t = heading ? 'h3' : 'span';
+            const contentTxt = c.text.characters.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            items.push(`<li><${t}>${contentTxt}</${t}></li>`);
+          } else {
+            items.push(`<li>${emit(c)}</li>`);
+          }
+        }
+        children = [`<ul>${items.join('')}</ul>`];
+      } else {
+        children = node.children.map(c => emit(c));
+      }
+    }
     const content = node.text?.characters ? node.text.characters.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
     if (!children.length) {
       return `<${tag} style={{ ${styleBlock} }}${roleAria}>${content}</${tag}>`;
@@ -219,10 +339,7 @@ export function generateReactComponentSource(ir: DesignNode | null | undefined, 
 }
 
 // global for tests (declaration style)
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-if (typeof global !== 'undefined' && !(global as any).generateReactComponentSource) {
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore
-  (global as any).generateReactComponentSource = generateReactComponentSource;
+if (typeof global !== 'undefined') {
+  const g = global as Record<string, unknown>;
+  if (!g.generateReactComponentSource) g.generateReactComponentSource = generateReactComponentSource;
 }

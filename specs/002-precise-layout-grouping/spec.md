@@ -84,28 +84,31 @@ As a user viewing a generated page from a Figma design, I want the footer (and s
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
-- **FR-001**: System MUST detect candidate column groupings when ≥2 sibling groups share (a) identical top Y within tolerance (≤2px), (b) consistent horizontal gaps within ±4px variance, and (c) similar vertical internal structure.
-- **FR-002**: System MUST represent a detected column grouping as a semantic container (multi-column footer section) with an ordered list of columns preserving original left-to-right order.
-- **FR-003**: System MUST extract text style properties (font family, weight, size, line height, letter spacing, color, paragraph spacing) into reusable style tokens and reference them instead of rendering generic placeholders.
-- **FR-004**: System MUST render actual text content when a text node has non-empty characters; placeholders (skeleton bars) MUST only appear when a node is empty or explicitly flagged for deferred content.
-- **FR-005**: System MUST extract frame padding (top, right, bottom, left) and inter-column gap and apply these as layout spacing in the rendered footer (applied within ±1px tolerance).
-- **FR-006**: System MUST honor Figma constraints without introducing automatic column wrapping; columns remain on a single horizontal line regardless of viewport width. If the viewport is narrower than total column width, a horizontal scrollbar MUST allow full-width inspection (no internal reflow/wrap).
-- **FR-007**: System MUST export vector/icon nodes in the footer as inline SVG or accessible image elements with descriptive labels derived from layer names; on export failure it MUST render a generic monochrome placeholder SVG (maintaining size) with the same accessible label and log the failure.
-- **FR-008**: System MUST apply semantic and accessible structure: container recognized as footer section; site title as heading level (h2 unless conflicting); link groups as lists with list items and navigable links; icons with aria-labels.
-- **FR-009**: System MUST correctly resolve color & opacity for text and icons, falling back to inherited parent color before using a high-contrast placeholder.
-- **FR-010**: System MUST de-duplicate identical text style definitions, issuing a single token/class reused across all matching nodes (deterministic naming rules documented separately).
-- **FR-011**: System SHOULD cache normalized style and layout computations so repeated similar nodes do not exceed performance budget: median added processing time < 10ms per column across 3 consecutive warm runs on reference environment (4-core/8-thread ~2.4GHz CPU, frequency scaling minimized).
-- **FR-012**: System MUST provide deterministic output ordering for columns and items across runs given identical Figma input (tested via snapshot determinism).
-- **FR-013**: System MUST expose instrumentation/log entries when grouping detected, skipped, or ambiguous for observability.
-- **FR-014**: System MUST support any number of footer columns (≥2) in a single grouping without enforcing a hard maximum; overflow is handled exclusively via horizontal scrolling (no forced regrouping or truncation).
-- **FR-015**: System MUST provide measurable fidelity tolerance: spacing & font sizes within ±1px of Figma; brand palette colors (as identified in design tokens) exact hex match; all other colors ΔE ≤ 3 using CIEDE2000 (tested via color fidelity contract tasks).
+NOTE: FR-001 & FR-002 merged (ordering now part of FR-001). FR-002 retained for traceability (no new scope).
+NOTE: FR-003 & FR-010 merged (dedupe + deterministic naming). FR-010 retained for traceability.
+
+- **FR-001**: Grouping Detection & Ordering — System MUST detect candidate column groupings when ≥2 sibling frames share: (a) top Y within ≤2px tolerance, (b) horizontal gap variance ≤±4px, (c) vertical structure similarity defined as: same number of child nodes OR difference ≤1. Result MUST be ordered left→right deterministically.
+- **FR-002** (merged into FR-001, no additional acceptance): (Trace) Multi-column container semantic representation preserved.
+- **FR-003**: Text Style Tokenization & Dedupe — System MUST extract text style properties (fontFamily, weight, size, lineHeight, letterSpacing, colorHex, paragraphSpacing) into deterministic tokens; identical signatures collapse into one token with usageCount. Deterministic naming: slug of normalized properties; if slug length > 40 chars, append stable 8-char FNV-1a hash (lowercase hex). Collisions (rare) MUST fall back to appending an incrementing numeric suffix while retaining deterministic ordering.
+- **FR-004**: Placeholder Suppression — Render actual text for non-empty nodes; skeleton placeholder bars MUST appear only for nodes with empty/whitespace content or explicit defer flag. Verification: no placeholder element for a node whose characters.length > 0.
+- **FR-005**: Spacing Fidelity — Extract frame padding (TRBL) and inter-column gap; apply within ±1px (measured on IR numeric values, not post-layout computed CSS). Gap tolerance is absolute pixel difference.
+- **FR-006**: Non-Wrapping Layout — Columns never wrap; horizontal scrollbar appears if total width > viewport; no column order reflow.
+- **FR-007**: Icon Export & Fallback — Inline SVG export for vector/icon nodes; fallback placeholder (monochrome rectangle or generic icon) when: vectorData missing, parse failure, or empty path list. Accessible label derived: kebab/dash/underscore name → space-separated, sentence case (first letter capitalized) with fallback "Icon". Failure event logged.
+- **FR-008**: Semantic & A11y Structure — Footer rendered as <footer>; primary title heading level determined by first available level not already used above (default h2). Link groups: <ul><li>. Icons: aria-label attribute with normalized label. Logical tab order left→right preserved. Deterministic label normalization spec: split on [-_], lower-case, capitalize first token.
+- **FR-009**: Color & Opacity Resolution Chain — For text/icon fill: use node fill color if present; else inherit nearest ancestor text color; else use brand primary if mapping by style name; else fallback to neutral token (e.g., #444). Opacity multiplies ancestor chain (cascading). Only when all fail, use high-contrast placeholder (#000 at 20% opacity). Provide deltaE ≤3 for non-brand comparisons (CIEDE2000) and exact hex for brand matches.
+- **FR-010** (merged in FR-003, trace): Deterministic naming & dedupe handled in FR-003.
+- **FR-011**: Performance Budget — Median added processing time (<10ms/column) over 3 warm runs (discard first cold run). Early smoke test: small 4-column footer must run <5ms/column median. Full stress: 5,000 nodes total IR within existing global 5s budget.
+- **FR-012**: Determinism — Two consecutive generations with identical input produce byte-identical outputs for IR → code (excluding timestamp/log ts fields). Early smoke test after grouping + token registry; full test after icon & logging integration.
+- **FR-013**: Observability Events — Emit events: grouping_detected {columns, items, durationMs}; grouping_skipped {reason}; token_dedup_applied {tokens, collapsed}; icon_export_failed {iconId, reason}; performance_sample {section, columns, msPerColumn}. Absence rule: Do NOT emit grouping_skipped if grouping_detected emitted.
+- **FR-014**: Unlimited Columns — Support arbitrary column count (≥2) with horizontal scroll; performance scaling linear (validated at 12, 20 columns, and large-column functional test ≥20).
+- **FR-015**: Visual Fidelity Tolerances — Spacing & font sizes ±1px (IR measured), brand colors exact (# case-insensitive), other colors CIEDE2000 ΔE ≤3. Opacity inheritance validated; report delta numeric for non-brand.
 
 ### Key Entities *(include if feature involves data)*
 - **FooterSection**: Represents an extracted multi-column grouping of related footer content. Attributes: columns[], padding, gap, breakpoint policy, semantic role.
 - **FooterColumn**: Represents a vertical collection of related nodes (text items, icons). Attributes: order index, items[], deduped style references.
 - **TextStyleToken**: Logical style descriptor created from one or more Figma text nodes sharing identical style properties.
 - **IconAsset**: Exported representation of a vector/icon with name, accessible label, svg content reference.
-- **InstrumentationEvent**: Logging entity capturing decisions (group_detected, group_skipped_reason, style_dedup_applied, icon_export_failed).
+- **InstrumentationEvent**: Logging entity capturing decisions (grouping_detected, grouping_skipped, token_dedup_applied, icon_export_failed, performance_sample).
 
 <!-- Placeholder Key Entities section removed after clarifications to avoid confusion -->
 

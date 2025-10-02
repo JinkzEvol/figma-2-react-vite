@@ -125,3 +125,72 @@ Determinism Benefit: If you check the emitted TSX into version control, design c
 
 Future Scope Ideas: custom component name, CSS module extraction, external style tokens once introduced.
 
+
+## Feature 002: Precise Layout Grouping & Fidelity
+
+Adds improved footer/layout fidelity and semantic generation:
+
+- Column grouping heuristic with deterministic ordering (FR-001/002)
+- Text style token registry + dedupe (FR-003/010) & collision handling
+- Placeholder text suppression (FR-004)
+- Spacing & padding fidelity (FR-005) and large layout non-wrapping (FR-006/014)
+- Icon export with fallback + accessible labels (FR-007/008)
+- Semantic structure hints (lists, headings) (FR-008)
+- Color & opacity resolution chain + brand palette externalization (FR-009/015)
+- Deterministic code generation, performance sampling events (FR-011/012/013)
+- Unlimited columns scalability tests (FR-014)
+- React component source emission (FR-023/024)
+
+### Generate React Component Source
+
+```ts
+import { buildIR } from './src/ir';
+import { generateReactComponentSource } from './src/codeGenerator';
+
+const ir = buildIR(rootFigmaNode);
+const source = generateReactComponentSource(ir, { componentName: 'FooterComponent', memo: true });
+console.log(source);
+```
+
+### Performance Re-Verification (FR-011)
+
+```powershell
+pnpm test --filter=performance -- --run
+pnpm test src/tests/integration/performance.integration.test.ts
+```
+Expect:
+- < 10 ms/column median for 12–20 column synthetic footers
+- < 5000 ms total for 5k node IR end-to-end
+- `performance_sample` events with msPerColumn logged
+
+### Determinism (FR-012)
+```powershell
+pnpm test src/tests/contract/determinismSmoke.contract.test.ts
+pnpm test src/tests/contract/determinismExtended.contract.test.ts
+```
+Outputs must be byte-identical (excluding timestamps / performance metrics).
+
+### Observability Events (FR-013)
+Event types to expect: `grouping_detected`, `token_dedup_applied`, `icon_export_failed`, `performance_sample`. Absence of `grouping_skipped` when grouping succeeds.
+
+### FR Coverage Matrix
+
+| FR | Primary Tests |
+|----|---------------|
+| FR-001/002 | grouping.contract.test.ts, autoLayout.integration.test.ts |
+| FR-003/010 | styleTokens.contract.test.ts, tokenCollision.contract.test.ts |
+| FR-004 | textPlaceholderSuppression.contract.test.ts |
+| FR-005 | spacingPadding.contract.test.ts |
+| FR-006 | largeColumns.integration.test.ts |
+| FR-007 | iconExport.contract.test.ts |
+| FR-008 | semanticStructure.contract.test.ts |
+| FR-009 | colorOpacityFallback.contract.test.ts, colorFidelity.contract.test.ts |
+| FR-011 | performance.integration.test.ts + performance tests |
+| FR-012 | determinismSmoke.contract.test.ts, determinismExtended.contract.test.ts |
+| FR-013 | loggingEvents.contract.test.ts, loggingObservability.contract.test.ts |
+| FR-014 | largeColumns.integration.test.ts |
+| FR-015 | colorFidelity.contract.test.ts |
+| FR-023/024 | reactComponentGeneration.contract.test.ts |
+
+See `specs/002-precise-layout-grouping/spec.md` for full FR descriptions.
+
