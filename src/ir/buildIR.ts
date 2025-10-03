@@ -1,11 +1,55 @@
 import type { FigmaNode } from '../types'
 
+/**
+ * Positioning information for a design node.
+ * 
+ * Determines how a node should be positioned in CSS:
+ * - `absolute`: Use CSS `position: absolute` with `left` and `top` values
+ * - `flex-item`: Child of an auto-layout container (uses flexbox)
+ * - `root`: Top-level node without a parent
+ * 
+ * @property {string} type - The positioning strategy to use
+ * @property {number} [x] - Horizontal position in pixels, relative to parent (only for `absolute`)
+ * @property {number} [y] - Vertical position in pixels, relative to parent (only for `absolute`)
+ * 
+ * @example
+ * ```typescript
+ * // Absolute positioning at (50, 75)
+ * { type: 'absolute', x: 50, y: 75 }
+ * 
+ * // Flex item (no coordinates needed)
+ * { type: 'flex-item' }
+ * 
+ * // Root node
+ * { type: 'root' }
+ * ```
+ */
 export interface PositionInfo {
   type: 'absolute' | 'flex-item' | 'root'
   x?: number  // px, relative to parent
   y?: number  // px, relative to parent
 }
 
+/**
+ * Intermediate representation (IR) of a Figma design node.
+ * 
+ * This normalized structure extracts relevant design properties from Figma's API format
+ * into a clean, type-safe format suitable for code generation.
+ * 
+ * @property {string} id - Unique identifier from Figma
+ * @property {string} name - Node name from Figma
+ * @property {string} type - Normalized node type (FRAME, RECTANGLE, TEXT, etc.)
+ * @property {number} [width] - Width in pixels
+ * @property {number} [height] - Height in pixels
+ * @property {number} [opacity] - Opacity value (0-1), only set if < 1
+ * @property {PositionInfo} [position] - Positioning information (added in Feature 003)
+ * @property {Object} [layout] - Auto-layout properties (flexbox)
+ * @property {Object} [visual] - Visual styling (background, border, radius)
+ * @property {Object} [effects] - Visual effects (shadows, blur)
+ * @property {Object} [text] - Text content and typography
+ * @property {Object} [placeholder] - Accessibility placeholder info
+ * @property {DesignNode[]} [children] - Child nodes
+ */
 export interface DesignNode {
   id: string
   name: string
@@ -124,10 +168,49 @@ function buildText(node: FigmaNode): DesignNode['text'] | undefined {
 function isHidden(node: FigmaNode): boolean { return node.visible === false }
 
 /**
- * Determines the positioning type for a node based on its parent context
- * @param node - The Figma node to analyze
- * @param parent - Optional parent node for context
- * @returns PositionInfo describing how the node should be positioned, or undefined if node lacks absoluteBoundingBox
+ * Determines the positioning type for a node based on its parent context.
+ * 
+ * This function analyzes a Figma node and its parent to determine the appropriate
+ * CSS positioning strategy. The logic follows these rules:
+ * 
+ * 1. If node has no `absoluteBoundingBox`, returns `undefined` (can't position)
+ * 2. If node has no parent, returns `{ type: 'root' }` (top-level element)
+ * 3. If parent uses auto-layout (`HORIZONTAL` or `VERTICAL`), returns `{ type: 'flex-item' }`
+ * 4. Otherwise, calculates relative coordinates and returns `{ type: 'absolute', x, y }`
+ * 
+ * @param {FigmaNode} node - The Figma node to analyze
+ * @param {FigmaNode} [parent] - Optional parent node for context
+ * 
+ * @returns {PositionInfo | undefined} Positioning information, or undefined if node lacks bounding box
+ * 
+ * @example
+ * ```typescript
+ * // Root node (no parent)
+ * const pos1 = buildPosition(rootNode);
+ * // Returns: { type: 'root' }
+ * 
+ * // Child of auto-layout parent
+ * const pos2 = buildPosition(childNode, flexParent);
+ * // Returns: { type: 'flex-item' }
+ * 
+ * // Child of manual layout parent
+ * const pos3 = buildPosition(childNode, manualParent);
+ * // Returns: { type: 'absolute', x: 50, y: 75 }
+ * 
+ * // Node without bounding box
+ * const pos4 = buildPosition(invalidNode);
+ * // Returns: undefined
+ * ```
+ * 
+ * @remarks
+ * - Coordinates are calculated relative to parent's `absoluteBoundingBox`
+ * - If parent lacks `absoluteBoundingBox`, treats parent position as (0, 0)
+ * - Logs warnings for missing positioning data (doesn't throw errors)
+ * - Pure function: does not mutate input parameters
+ * - Deterministic: same input always produces same output
+ * 
+ * @see {@link PositionInfo} for return type details
+ * @since Feature 003 - Absolute Positioning
  */
 export function buildPosition(node: FigmaNode, parent?: FigmaNode): PositionInfo | undefined {
   // If node has no bounding box, we can't position it
