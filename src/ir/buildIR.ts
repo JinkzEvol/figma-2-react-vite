@@ -1,5 +1,11 @@
 import type { FigmaNode } from '../types'
 
+export interface PositionInfo {
+  type: 'absolute' | 'flex-item' | 'root'
+  x?: number  // px, relative to parent
+  y?: number  // px, relative to parent
+}
+
 export interface DesignNode {
   id: string
   name: string
@@ -7,6 +13,7 @@ export interface DesignNode {
   width?: number
   height?: number
   opacity?: number
+  position?: PositionInfo
   layout?: {
     direction?: 'row' | 'column'
     gap?: number
@@ -116,7 +123,57 @@ function buildText(node: FigmaNode): DesignNode['text'] | undefined {
 
 function isHidden(node: FigmaNode): boolean { return node.visible === false }
 
-export function buildIR(raw: FigmaNode): DesignNode | null {
+/**
+ * Determines the positioning type for a node based on its parent context
+ * @param node - The Figma node to analyze
+ * @param parent - Optional parent node for context
+ * @returns PositionInfo describing how the node should be positioned, or undefined if node lacks absoluteBoundingBox
+ */
+export function buildPosition(node: FigmaNode, parent?: FigmaNode): PositionInfo | undefined {
+  // If node has no bounding box, we can't position it
+  if (!node.absoluteBoundingBox) {
+    if (typeof console !== 'undefined' && console.warn) {
+      console.warn('[buildPosition] Node missing absoluteBoundingBox', { 
+        nodeId: node.id, 
+        nodeName: node.name,
+        nodeType: node.type
+      })
+    }
+    return undefined
+  }
+
+  // If no parent, this is a root node
+  if (!parent) {
+    return { type: 'root' }
+  }
+
+  // If parent has auto-layout (HORIZONTAL or VERTICAL), child is a flex item
+  if (parent.layoutMode === 'HORIZONTAL' || parent.layoutMode === 'VERTICAL') {
+    return { type: 'flex-item' }
+  }
+
+  // Otherwise, it's absolutely positioned
+  // Calculate position relative to parent
+  // If parent lacks absoluteBoundingBox, treat as (0, 0) and log warning
+  if (!parent.absoluteBoundingBox) {
+    if (typeof console !== 'undefined' && console.warn) {
+      console.warn('[buildPosition] Parent missing absoluteBoundingBox for absolute child', {
+        nodeId: node.id,
+        nodeName: node.name,
+        parentId: parent.id,
+        parentName: parent.name
+      })
+    }
+  }
+  const parentX = parent.absoluteBoundingBox?.x ?? 0
+  const parentY = parent.absoluteBoundingBox?.y ?? 0
+  const x = node.absoluteBoundingBox.x - parentX
+  const y = node.absoluteBoundingBox.y - parentY
+
+  return { type: 'absolute', x, y }
+}
+
+export function buildIR(raw: FigmaNode, parent?: FigmaNode): DesignNode | null {
   if (!raw || isHidden(raw)) return null
   const base: DesignNode = {
     id: raw.id,
@@ -130,13 +187,19 @@ export function buildIR(raw: FigmaNode): DesignNode | null {
   const visual = buildVisual(raw); if (visual) base.visual = visual
   const effects = buildEffects(raw); if (effects) base.effects = effects
   const text = buildText(raw); if (text) base.text = text
+  
+  // Add position information
+  const position = buildPosition(raw, parent)
+  if (position) base.position = position
+  
   if (raw.fills?.some(f => f.type === 'IMAGE')) {
     base.placeholder = { role: 'img', ariaLabel: `${raw.name || 'image'} placeholder` }
   }
   if (raw.children && raw.children.length) {
     const childIR: DesignNode[] = []
     for (const c of raw.children) {
-      const built = buildIR(c)
+      // Pass current node as parent for children
+      const built = buildIR(c, raw)
       if (built) childIR.push(built)
     }
     if (childIR.length) base.children = childIR

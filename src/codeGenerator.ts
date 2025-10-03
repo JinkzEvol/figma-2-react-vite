@@ -136,6 +136,18 @@ export function generateCodeFromIR(ir: DesignNode | null | undefined): string {
     const s: Record<string,string> = {};
     if (node.width) s.width = node.width + 'px';
     if (node.height) s.height = node.height + 'px';
+    
+    // Position CSS generation (T009)
+    if (node.position?.type === 'absolute') {
+      s.position = 'absolute';
+      if (typeof node.position.x === 'number') s.left = node.position.x + 'px';
+      if (typeof node.position.y === 'number') s.top = node.position.y + 'px';
+    }
+    // If node has absolute children and isn't already absolute, make it relative
+    if (s.position !== 'absolute' && node.children?.some(c => c.position?.type === 'absolute')) {
+      s.position = 'relative';
+    }
+    
     if (node.layout) {
       s.display = 'flex';
       if (node.layout.direction) s.flexDirection = node.layout.direction;
@@ -246,6 +258,18 @@ export function generateReactComponentSource(ir: DesignNode | null | undefined, 
     const s: Record<string,string|number> = {};
     if (node.width) s.width = node.width + 'px';
     if (node.height) s.height = node.height + 'px';
+    
+    // Position CSS generation (T010)
+    if (node.position?.type === 'absolute') {
+      s.position = 'absolute';
+      if (typeof node.position.x === 'number') s.left = node.position.x + 'px';
+      if (typeof node.position.y === 'number') s.top = node.position.y + 'px';
+    }
+    // If node has absolute children and isn't already absolute, make it relative
+    if (s.position !== 'absolute' && node.children?.some(c => c.position?.type === 'absolute')) {
+      s.position = 'relative';
+    }
+    
     if (node.layout) {
       s.display = 'flex';
       if (node.layout.direction) s['flex-direction'] = node.layout.direction;
